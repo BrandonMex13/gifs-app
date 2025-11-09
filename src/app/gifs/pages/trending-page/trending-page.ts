@@ -1,4 +1,4 @@
-import { Component, ElementRef, inject, viewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, inject, viewChild } from '@angular/core';
 import { GifService } from '../../services/gifs.service';
 import { ScrollStateService } from 'src/app/shared/services/scroll-state.service';
 
@@ -8,11 +8,20 @@ import { ScrollStateService } from 'src/app/shared/services/scroll-state.service
   templateUrl: './trending-page.html',
   styleUrl: './trending-page.css',
 })
-export class TrendingPage {
+export class TrendingPage implements AfterViewInit {
   scrollDivRef = viewChild<ElementRef<HTMLDivElement>>('groupDiv');
 
   gifService = inject(GifService);
   scrollStateService = inject(ScrollStateService);
+
+  ngAfterViewInit(): void {
+    const scrollDiv = this.scrollDivRef()?.nativeElement;
+
+    if(!scrollDiv)
+      return;
+
+    scrollDiv.scrollTop = this.scrollStateService.trendingScrollState();
+  }
 
   onScroll( event : Event) {
     const scrollDiv = this.scrollDivRef()?.nativeElement;
