@@ -1,10 +1,19 @@
 import { HttpClient } from '@angular/common/http';
-import { inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { environment } from '@environments/environment';
-import { Gif } from '../interfaces/gif.interface';
+import { map, Observable, tap } from 'rxjs';
 import { GifMapper } from '../mapper/gif.mapper';
-import { map } from 'rxjs';
+import { Gif } from '../interfaces/gif.interface';
 import type { GiphyResponse } from '../interfaces/giphy.interfaces';
+
+const GIF_KEY = 'gifs'
+
+const loadFromLocalStorage = () => {
+  const gifsFromLocalStorage = localStorage.getItem(GIF_KEY) ?? '{}';
+  const gifs = JSON.parse(gifsFromLocalStorage);
+
+  return gifs;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -18,9 +27,17 @@ export class GifService {
   trendingGifs = signal<Gif[]>([]);
   trendingGifsLoading = signal(true);
 
+  searchHistory = signal<Record<string, Gif[]>>(loadFromLocalStorage());
+  searchHistoryKeys = computed( () => Object.keys(this.searchHistory()));
+
   constructor(){
     this.loadTrendingGifs();
   }
+
+  saveGifsToLocalStorage = effect( () => {
+    const historyString = JSON.stringify(this.searchHistory());
+    localStorage.setItem(GIF_KEY, historyString);
+  });
 
   loadTrendingGifs() {
     this.http.get<GiphyResponse>(`${this.env.giphyUrl}/gifs/trending`, {
@@ -36,7 +53,7 @@ export class GifService {
     });
   }
 
-  searchGifs( query : string ){
+  searchGifs( query : string ) : Observable<Gif[]> {
     return this.http.get<GiphyResponse>(`${this.env.giphyUrl}/gifs/search`, {
       params: {
         api_key: this.env.giphyApiKey,
@@ -44,9 +61,19 @@ export class GifService {
         q: query
       }
     }).pipe(
-      map( ({ data }) => GifMapper.mapGifyItemsToGifArray( data ))
+      map( ({ data }) => GifMapper.mapGifyItemsToGifArray( data )),
 
-      // TODO: Historial
+      // Historial
+      tap( data => {
+        this.searchHistory.update( history => ({
+          ...history,
+          [query.toLowerCase()] : data
+        }));
+      })
     );
+  }
+
+  getHistoryGifs( query : string) : Gif[] {
+    return this.searchHistory()[query] ?? [];
   }
 }
